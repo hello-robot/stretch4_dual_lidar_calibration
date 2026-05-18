@@ -119,7 +119,7 @@ class DualLidarCalibrator(Node):
             # Look up transform from right to left
             # We want points in RIGHT frame to be transformed to LEFT frame.
             # So we need transform: target=left, source=right
-            tf_stamped = self.get_transform('link_lidar_left', 'link_lidar_right')
+            tf_stamped = self.get_transform('lidar_left_link', 'lidar_right_link')
             if tf_stamped is None:
                 return
             self.T_dom = self.transform_to_matrix(tf_stamped)

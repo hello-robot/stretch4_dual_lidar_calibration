@@ -57,7 +57,7 @@ class LidarProcessor:
         else:
             return point_cloud2.create_cloud_xyz32(header, points[:, :3])
 
-    def unify_clouds(self, left_msg, right_msg, tf_buffer, left_lidar_frame='link_lidar_left', base_link_frame='base_link', base_footprint_frame='base_footprint'):
+    def unify_clouds(self, left_msg, right_msg, tf_buffer, left_lidar_frame='lidar_left_link', base_link_frame='base_link', base_footprint_frame='base_footprint'):
         """
         Returns unified point cloud in base_footprint frame (numpy Nx3).
         """

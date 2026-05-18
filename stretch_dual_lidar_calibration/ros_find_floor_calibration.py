@@ -24,10 +24,10 @@ class FloorCalibrationNode(Node):
         self.declare_parameter('right_lidar_topic', '/lidar_points_right')
         self.right_lidar_topic = self.get_parameter('right_lidar_topic').value
         
-        self.declare_parameter('base_link_frame', 'base_link')
-        self.base_link_frame = self.get_parameter('base_link_frame').value
+        self.declare_parameter('base_footprint_frame', 'base_footprint')
+        self.base_footprint_frame = self.get_parameter('base_footprint_frame').value
         
-        self.declare_parameter('left_lidar_frame', 'link_lidar_left')
+        self.declare_parameter('left_lidar_frame', 'lidar_left_link')
         self.left_lidar_frame = self.get_parameter('left_lidar_frame').value
         
         self.declare_parameter('num_samples', 30)
@@ -89,17 +89,17 @@ class FloorCalibrationNode(Node):
             return
             
         # Get TF from Left Lidar to Base Link
-        # We assume Left Lidar points are in 'link_lidar_left' (or whatever left_msg.header.frame_id is?)
+        # We assume Left Lidar points are in 'lidar_left_link' (or whatever left_msg.header.frame_id is?)
         # Let's rely on params or header.
         source_frame = left_msg.header.frame_id if left_msg.header.frame_id else self.left_lidar_frame
-        target_frame = self.base_link_frame
+        target_frame = self.base_footprint_frame
         
         tf_stamped = self.get_transform(target_frame, source_frame)
         if tf_stamped is None:
             self.get_logger().warn(f"Waiting for TF {source_frame} -> {target_frame}", throttle_duration_sec=2.0)
             return
             
-        T_bl_left = self.transform_to_matrix(tf_stamped)
+        T_bf_left = self.transform_to_matrix(tf_stamped)
 
         # Convert to numpy
         left_points = self.msg_to_numpy(left_msg)
@@ -112,12 +112,12 @@ class FloorCalibrationNode(Node):
         # Merge clouds (Now in Left Lidar Frame)
         merged_points_left = np.vstack((left_points, right_points))
         
-        # Transform to Base Link Frame
-        # Points P_bl = T_bl_left * P_left
-        merged_points_bl = self.calibration.apply(merged_points_left, transform=T_bl_left)
+        # Transform to Base Footprint Frame
+        # Points P_bf = T_bf_left * P_left
+        merged_points_bf = self.calibration.apply(merged_points_left, transform=T_bf_left)
         
         if self.mode == 'accumulate_points':
-            self.collected_samples.append(merged_points_bl)
+            self.collected_samples.append(merged_points_bf)
             self.get_logger().info(f"Collected sample {len(self.collected_samples)}/{self.num_samples}")
             
             if len(self.collected_samples) >= self.num_samples:
@@ -129,7 +129,7 @@ class FloorCalibrationNode(Node):
             self.get_logger().info(f"Processing frame {len(self.collected_samples) + 1}/{self.num_samples}...")
             try:
                 # Use verbose=False to reduce spam
-                T, params = fit_plane.fit_floor_iterative(merged_points_bl, verbose=False, fit_method=self.fit_method)
+                T, params = fit_plane.fit_floor_iterative(merged_points_bf, verbose=False, fit_method=self.fit_method)
                 self.collected_samples.append(T)
                 # We might want to save params too? For averaging, averaging params (normal, d) is tricky.
                 # Transform averaging handles normal (rotation) well. 'd' is in translation Z roughly.
@@ -160,8 +160,8 @@ class FloorCalibrationNode(Node):
         
         # Params? 
         # We can extract params from T_avg if we assume T_avg represents the floor frame.
-        # T_avg is base_link -> base_footprint (or whatever fit_floor_iterative returns).
-        # T definition: P_fp = T * P_bl
+        # T_avg is base_footprint -> floor_plane (or whatever fit_floor_iterative returns).
+        # T definition: P_fp = T * P_bf
         # Z-axis of P_fp is [0, 0, 1]. In P_bl frame, it is R_bl_fp * [0,0,1]?
         # Wait, T has R usually defined as R_fp_to_bl? No.
         # fit_floor_iterative returns T constructed from R.T, where R cols are X_f, Y_f, Z_f.
@@ -197,7 +197,7 @@ class FloorCalibrationNode(Node):
         self.get_logger().info(f"Params: {params}")
         
         robot_id = os.environ.get('HELLO_FLEET_ID', 'unknown_robot')
-        if self.calibration.save(floor_to_base_link_transform=transform, floor_model_params=params, robot_id=robot_id):
+        if self.calibration.save(floor_plane_to_base_footprint_transform=transform, floor_model_params=params, robot_id=robot_id):
             self.get_logger().info("Saved to dual_lidar_calibration.yaml")
         else:
             self.get_logger().error("Failed to save.")
