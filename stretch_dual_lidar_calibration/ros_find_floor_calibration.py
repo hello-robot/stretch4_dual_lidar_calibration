@@ -99,7 +99,7 @@ class FloorCalibrationNode(Node):
             self.get_logger().warn(f"Waiting for TF {source_frame} -> {target_frame}", throttle_duration_sec=2.0)
             return
             
-        T_bf_left = self.transform_to_matrix(tf_stamped)
+        T_bl_left = self.transform_to_matrix(tf_stamped)
 
         # Convert to numpy
         left_points = self.msg_to_numpy(left_msg)
@@ -112,12 +112,12 @@ class FloorCalibrationNode(Node):
         # Merge clouds (Now in Left Lidar Frame)
         merged_points_left = np.vstack((left_points, right_points))
         
-        # Transform to Base Footprint Frame
-        # Points P_bf = T_bf_left * P_left
-        merged_points_bf = self.calibration.apply(merged_points_left, transform=T_bf_left)
+        # Transform to Base Link Frame
+        # Points P_bl = T_bl_left * P_left
+        merged_points_bl = self.calibration.apply(merged_points_left, transform=T_bl_left)
         
         if self.mode == 'accumulate_points':
-            self.collected_samples.append(merged_points_bf)
+            self.collected_samples.append(merged_points_bl)
             self.get_logger().info(f"Collected sample {len(self.collected_samples)}/{self.num_samples}")
             
             if len(self.collected_samples) >= self.num_samples:
@@ -129,7 +129,7 @@ class FloorCalibrationNode(Node):
             self.get_logger().info(f"Processing frame {len(self.collected_samples) + 1}/{self.num_samples}...")
             try:
                 # Use verbose=False to reduce spam
-                T, params = fit_plane.fit_floor_iterative(merged_points_bf, verbose=False, fit_method=self.fit_method)
+                T, params = fit_plane.fit_floor_iterative(merged_points_bl, verbose=False, fit_method=self.fit_method)
                 self.collected_samples.append(T)
                 # We might want to save params too? For averaging, averaging params (normal, d) is tricky.
                 # Transform averaging handles normal (rotation) well. 'd' is in translation Z roughly.
@@ -160,13 +160,31 @@ class FloorCalibrationNode(Node):
         
         # Params? 
         # We can extract params from T_avg if we assume T_avg represents the floor frame.
-        # T_avg is base_link -> base_footprint (T_bl_bf)
-        # T definition: P_bl = T * P_fp
+        # T_avg is base_link -> base_footprint (or whatever fit_floor_iterative returns).
+        # T definition: P_fp = T * P_bl
+        # Z-axis of P_fp is [0, 0, 1]. In P_bl frame, it is R_bl_fp * [0,0,1]?
+        # Wait, T has R usually defined as R_fp_to_bl? No.
+        # fit_floor_iterative returns T constructed from R.T, where R cols are X_f, Y_f, Z_f.
+        # So R is R_bl_fp (rotation matrix with columns as basis vectors of fp in bl).
+        # So Z_f (normal) is the 3rd column of R?
+        # Yes. R = [X_f, Y_f, Z_f].
+        # T[:3,:3] = R.T
+        # So T's rotation part is R.T.
+        # To get Z_f from T:
+        # R = T[:3,:3].T
+        # Z_f = R[:, 2]
         
         R_matrix = T_avg[:3, :3].T
         Z_f = R_matrix[:, 2]
         
-        t_origin = -R_matrix @ T_avg[:3, 3]
+        # d?
+        # t = T[:3, 3] = -R.T @ t_origin
+        # t_origin (translation of origin) = - R @ t
+        # d is distance along normal?
+        # In fit_floor_iterative: t_vec = d * Z_f.
+        # So t_origin should be roughly along Z_f.
+        
+        t_origin = - R_matrix @ T_avg[:3, 3]
         d = np.dot(t_origin, Z_f)
         
         params = [Z_f[0], Z_f[1], Z_f[2], d]
@@ -179,7 +197,7 @@ class FloorCalibrationNode(Node):
         self.get_logger().info(f"Params: {params}")
         
         robot_id = os.environ.get('HELLO_FLEET_ID', 'unknown_robot')
-        if self.calibration.save(base_link_to_base_footprint_transform=transform, floor_model_params=params, robot_id=robot_id):
+        if self.calibration.save(floor_to_base_link_transform=transform, floor_model_params=params, robot_id=robot_id):
             self.get_logger().info("Saved to dual_lidar_calibration.yaml")
         else:
             self.get_logger().error("Failed to save.")
