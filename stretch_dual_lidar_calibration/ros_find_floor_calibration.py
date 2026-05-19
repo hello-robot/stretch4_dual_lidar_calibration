@@ -163,10 +163,10 @@ class FloorCalibrationNode(Node):
         # T_avg is base_link -> base_footprint (T_bl_bf)
         # T definition: P_bl = T * P_fp
         
-        R_matrix = T_avg[:3, :3]
+        R_matrix = T_avg[:3, :3].T
         Z_f = R_matrix[:, 2]
         
-        t_origin = T_avg[:3, 3]
+        t_origin = -R_matrix @ T_avg[:3, 3]
         d = np.dot(t_origin, Z_f)
         
         params = [Z_f[0], Z_f[1], Z_f[2], d]

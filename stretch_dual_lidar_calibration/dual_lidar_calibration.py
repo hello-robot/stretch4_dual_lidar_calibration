@@ -42,7 +42,7 @@ class DualLidarCalibration:
                 # Older pyyaml
                 return yaml.load(content)
 
-    def save(self, right_to_left_transform=None, base_link_to_base_footprint_transform=None, floor_model_params=None, body_model_params=None, robot_id=None):
+    def save(self, right_to_left_transform=None, base_link_to_base_footprint_transform=None, floor_model_params=None, robot_id=None):
         """
         Save the calibration data to a YAML file.
         Updates provided fields, keeps existing ones if not provided.

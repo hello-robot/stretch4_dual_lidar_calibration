@@ -30,12 +30,23 @@ class BaseFootprintBroadcaster(Node):
         self.broadcaster = StaticTransformBroadcaster(self)
         self.broadcast_transforms()
     def broadcast_transforms(self):
-        # The calibration gives T_bl_bf directly, 
-        # which satisfies P_bl = T_bl_bf * P_bf
-        # A static transform from Parent=base_link to Child=base_footprint
-        # uses exactly this matrix.
+        # The calibration gives T_bf_from_bl directly, 
+        # which satisfies P_bf = T_bf_from_bl * P_bl
         
-        T_bl_bf = self.calibration.base_link_to_base_footprint_transform
+        T_bf_from_bl = self.calibration.base_link_to_base_footprint_transform
+        
+        # To broadcast a static transform from Parent=base_link to Child=base_footprint,
+        # tf2 requires the pose of base_footprint in base_link (T_bl_from_bf).
+        # We compute the inverse of T_bf_from_bl mathematically.
+        R_bf_from_bl = T_bf_from_bl[:3, :3]
+        t_bf_from_bl = T_bf_from_bl[:3, 3]
+        
+        R_bl_from_bf = R_bf_from_bl.T
+        t_bl_from_bf = -R_bl_from_bf @ t_bf_from_bl
+        
+        T_bl_from_bf = np.eye(4)
+        T_bl_from_bf[:3, :3] = R_bl_from_bf
+        T_bl_from_bf[:3, 3] = t_bl_from_bf
         
         # Create Message
         ts = TransformStamped()
@@ -43,11 +54,11 @@ class BaseFootprintBroadcaster(Node):
         ts.header.frame_id = self.base_link_frame
         ts.child_frame_id = self.base_footprint_frame
         
-        ts.transform.translation.x = T_bl_bf[0, 3]
-        ts.transform.translation.y = T_bl_bf[1, 3]
-        ts.transform.translation.z = T_bl_bf[2, 3]
+        ts.transform.translation.x = T_bl_from_bf[0, 3]
+        ts.transform.translation.y = T_bl_from_bf[1, 3]
+        ts.transform.translation.z = T_bl_from_bf[2, 3]
 
-        quat = R.from_matrix(T_bl_bf[:3, :3]).as_quat() # x, y, z, w
+        quat = R.from_matrix(T_bl_from_bf[:3, :3]).as_quat() # x, y, z, w
         ts.transform.rotation.x = quat[0]
         ts.transform.rotation.y = quat[1]
         ts.transform.rotation.z = quat[2]
