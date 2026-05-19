@@ -17,8 +17,8 @@ class DualLidarCalibration:
             self.filename = filename
         self.right_to_left_transform = None
         self.right_to_left_transform_metadata = None
-        self.floor_plane_to_base_footprint_transform = None
-        self.floor_plane_to_base_footprint_transform_metadata = None
+        self.base_link_to_base_footprint_transform = None
+        self.base_link_to_base_footprint_transform_metadata = None
         self.floor_model_params = None
         self.floor_model_params_metadata = None
         self.robot_id = None
@@ -42,7 +42,7 @@ class DualLidarCalibration:
                 # Older pyyaml
                 return yaml.load(content)
 
-    def save(self, right_to_left_transform=None, floor_plane_to_base_footprint_transform=None, floor_model_params=None, body_model_params=None, robot_id=None):
+    def save(self, right_to_left_transform=None, base_link_to_base_footprint_transform=None, floor_model_params=None, body_model_params=None, robot_id=None):
         """
         Save the calibration data to a YAML file.
         Updates provided fields, keeps existing ones if not provided.
@@ -70,13 +70,13 @@ class DualLidarCalibration:
                  val = right_to_left_transform
             data['right_to_left_transform'] = pack(val, robot_id, timestamp)
             
-        if floor_plane_to_base_footprint_transform is not None:
-            self.floor_plane_to_base_footprint_transform = floor_plane_to_base_footprint_transform
-            if hasattr(floor_plane_to_base_footprint_transform, 'tolist'):
-                 val = floor_plane_to_base_footprint_transform.tolist()
+        if base_link_to_base_footprint_transform is not None:
+            self.base_link_to_base_footprint_transform = base_link_to_base_footprint_transform
+            if hasattr(base_link_to_base_footprint_transform, 'tolist'):
+                 val = base_link_to_base_footprint_transform.tolist()
             else:
-                 val = floor_plane_to_base_footprint_transform
-            data['floor_plane_to_base_footprint_transform'] = pack(val, robot_id, timestamp)
+                 val = base_link_to_base_footprint_transform
+            data['base_link_to_base_footprint_transform'] = pack(val, robot_id, timestamp)
 
         if floor_model_params is not None:
             self.floor_model_params = floor_model_params
@@ -130,10 +130,10 @@ class DualLidarCalibration:
                         self.right_to_left_transform = np.array(d)
                         self.right_to_left_transform_metadata = m
                         
-                    d, m = unpack('floor_plane_to_base_footprint_transform')
+                    d, m = unpack('base_link_to_base_footprint_transform')
                     if d is not None:
-                        self.floor_plane_to_base_footprint_transform = np.array(d)
-                        self.floor_plane_to_base_footprint_transform_metadata = m
+                        self.base_link_to_base_footprint_transform = np.array(d)
+                        self.base_link_to_base_footprint_transform_metadata = m
                         
                     d, m = unpack('floor_model_params')
                     if d is not None:
@@ -165,7 +165,7 @@ class DualLidarCalibration:
         """
         missing = []
         if self.floor_model_params is None: missing.append('floor_model_params')
-        if self.floor_plane_to_base_footprint_transform is None: missing.append('floor_plane_to_base_footprint_transform')
+        if self.base_link_to_base_footprint_transform is None: missing.append('base_link_to_base_footprint_transform')
         if self.right_to_left_transform is None: missing.append('right_to_left_transform')
         
         if missing:
@@ -175,7 +175,7 @@ class DualLidarCalibration:
         # Check metadata
         items = [
             ('floor_model_params', self.floor_model_params_metadata),
-            ('floor_plane_to_base_footprint_transform', self.floor_plane_to_base_footprint_transform_metadata),
+            ('base_link_to_base_footprint_transform', self.base_link_to_base_footprint_transform_metadata),
             ('right_to_left_transform', self.right_to_left_transform_metadata)
         ]
         

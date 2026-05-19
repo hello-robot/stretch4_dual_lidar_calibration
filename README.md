@@ -65,7 +65,7 @@ You can find the all-in-one RViz configuration in the `rviz` directory showing t
 rviz2 -d rviz/dual_lidar_calibration.rviz
 ```
 
-_(Ensure that `ros_broadcast_calibration` is running to resolve the `floor_plane` transform)._
+_(Ensure that `ros_broadcast_calibration` is running to resolve the `base_footprint` transform)._
 
 ## Example Calibration File
 
@@ -98,7 +98,7 @@ right_to_left_transform:
       - 1.0
   robot_id: stretch-se4-4010
   timestamp: "2026-03-19T14:28:32.548974"
-floor_plane_to_base_footprint_transform:
+base_link_to_base_footprint_transform:
   data:
     - - 0.9999523981086859
       - 0.00018263214746540911
@@ -145,7 +145,7 @@ The first step is to find the static rigid body transform between the two LiDARs
 
 ### 2. Floor Plane Calibration (`ros_find_floor_calibration.py`)
 
-The second step is to determine the floor plane relative to the robot's base link and compute the `floor_plane` frame. This ensures the robot's URDF model sits correctly on the ground.
+The second step is to determine the floor plane relative to the robot's base link and compute the `base_footprint` frame. This ensures the robot's URDF model sits correctly on the ground.
 
 - **Data Accumulation**: The script transforms point clouds from both LiDARs into the `base_link` frame (using the previously computed dual-lidar transform and URDF transforms) and accumulates them to form a dense representation of the scene.
 - **Iterative Plane Fitting**: An iterative algorithm is used to robustly find the floor:
@@ -153,11 +153,11 @@ The second step is to determine the floor plane relative to the robot's base lin
   2.  **Outlier Rejection**: Points are filtered based on their distance from the current estimated plane model. The threshold significantly tightens over iterations (from 10cm down to 3mm).
   3.  **Normal Estimation**: **SVD (Singular Value Decomposition)** is performed on the inlying points to find the plane normal (the eigenvector corresponding to the smallest eigenvalue).
   4.  **Refinement**: The normal and height are iteratively updated until convergence.
-- **Frame Computation**: The `floor_plane` frame is defined such that:
+- **Frame Computation**: The `base_footprint` frame is defined such that:
   - Its origin is on the floor plane, directly below the `base_link` origin.
   - Its Z-axis is aligned with the floor normal.
   - Its X-axis is aligned with the projection of the `base_link` X-axis onto the floor.
-- **Result**: The transform `floor_plane_to_base_footprint_transform` is saved to `dual_lidar_calibration.yaml`. This transform maps points from the `floor_plane` frame to the `base_footprint` frame.
+- **Result**: The transform `base_link_to_base_footprint_transform` is saved to `dual_lidar_calibration.yaml`. This transform maps points from the `base_footprint` frame to the `base_link` frame.
 
 ## Body Shape Modeling
 

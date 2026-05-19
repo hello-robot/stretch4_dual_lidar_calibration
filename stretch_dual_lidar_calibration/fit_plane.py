@@ -302,7 +302,7 @@ def fit_floor_iterative(points, verbose=True, fit_method='least_squares'):
     
     R = np.column_stack((X_f, Y_f, Z_f))
     
-    # Rotation from base_link TO footprint is R.T
+    # Rotation from base_footprint TO base_link is R
     
     # Translation?
     # Origin of footprint expressed in base_link:
@@ -312,14 +312,12 @@ def fit_floor_iterative(points, verbose=True, fit_method='least_squares'):
     
     t = d_final * Z_f
     
-    # T_base_footprint_from_base_link
-    # P_fp = R.T * (P_bl - t)
-    #      = R.T * P_bl - R.T * t
+    # T_base_footprint_from_base_link (now named as T_bl_bf to match P_bl = T * P_fp)
     
     # 4x4
     T = np.eye(4)
-    T[:3, :3] = R.T
-    T[:3, 3] = -R.T @ t
+    T[:3, :3] = R
+    T[:3, 3] = t
     
     return T, [final_normal[0], final_normal[1], final_normal[2], d_final]
 

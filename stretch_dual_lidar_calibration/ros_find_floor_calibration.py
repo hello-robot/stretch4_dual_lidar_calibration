@@ -24,8 +24,8 @@ class FloorCalibrationNode(Node):
         self.declare_parameter('right_lidar_topic', '/lidar_points_right')
         self.right_lidar_topic = self.get_parameter('right_lidar_topic').value
         
-        self.declare_parameter('base_footprint_frame', 'base_footprint')
-        self.base_footprint_frame = self.get_parameter('base_footprint_frame').value
+        self.declare_parameter('base_link_frame', 'base_link')
+        self.base_link_frame = self.get_parameter('base_link_frame').value
         
         self.declare_parameter('left_lidar_frame', 'lidar_left_link')
         self.left_lidar_frame = self.get_parameter('left_lidar_frame').value
@@ -92,7 +92,7 @@ class FloorCalibrationNode(Node):
         # We assume Left Lidar points are in 'lidar_left_link' (or whatever left_msg.header.frame_id is?)
         # Let's rely on params or header.
         source_frame = left_msg.header.frame_id if left_msg.header.frame_id else self.left_lidar_frame
-        target_frame = self.base_footprint_frame
+        target_frame = self.base_link_frame
         
         tf_stamped = self.get_transform(target_frame, source_frame)
         if tf_stamped is None:
@@ -160,31 +160,13 @@ class FloorCalibrationNode(Node):
         
         # Params? 
         # We can extract params from T_avg if we assume T_avg represents the floor frame.
-        # T_avg is base_footprint -> floor_plane (or whatever fit_floor_iterative returns).
-        # T definition: P_fp = T * P_bf
-        # Z-axis of P_fp is [0, 0, 1]. In P_bl frame, it is R_bl_fp * [0,0,1]?
-        # Wait, T has R usually defined as R_fp_to_bl? No.
-        # fit_floor_iterative returns T constructed from R.T, where R cols are X_f, Y_f, Z_f.
-        # So R is R_bl_fp (rotation matrix with columns as basis vectors of fp in bl).
-        # So Z_f (normal) is the 3rd column of R?
-        # Yes. R = [X_f, Y_f, Z_f].
-        # T[:3,:3] = R.T
-        # So T's rotation part is R.T.
-        # To get Z_f from T:
-        # R = T[:3,:3].T
-        # Z_f = R[:, 2]
+        # T_avg is base_link -> base_footprint (T_bl_bf)
+        # T definition: P_bl = T * P_fp
         
-        R_matrix = T_avg[:3, :3].T
+        R_matrix = T_avg[:3, :3]
         Z_f = R_matrix[:, 2]
         
-        # d?
-        # t = T[:3, 3] = -R.T @ t_origin
-        # t_origin (translation of origin) = - R @ t
-        # d is distance along normal?
-        # In fit_floor_iterative: t_vec = d * Z_f.
-        # So t_origin should be roughly along Z_f.
-        
-        t_origin = - R_matrix @ T_avg[:3, 3]
+        t_origin = T_avg[:3, 3]
         d = np.dot(t_origin, Z_f)
         
         params = [Z_f[0], Z_f[1], Z_f[2], d]
@@ -197,7 +179,7 @@ class FloorCalibrationNode(Node):
         self.get_logger().info(f"Params: {params}")
         
         robot_id = os.environ.get('HELLO_FLEET_ID', 'unknown_robot')
-        if self.calibration.save(floor_plane_to_base_footprint_transform=transform, floor_model_params=params, robot_id=robot_id):
+        if self.calibration.save(base_link_to_base_footprint_transform=transform, floor_model_params=params, robot_id=robot_id):
             self.get_logger().info("Saved to dual_lidar_calibration.yaml")
         else:
             self.get_logger().error("Failed to save.")
