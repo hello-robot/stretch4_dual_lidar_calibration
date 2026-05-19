@@ -10,15 +10,15 @@ import sys
 
 from stretch_dual_lidar_calibration.dual_lidar_calibration import DualLidarCalibration
 
-class BaseFootprintBroadcaster(Node):
+class FloorPlaneBroadcaster(Node):
     def __init__(self):
-        super().__init__('base_footprint_broadcaster')
+        super().__init__('floor_plane_broadcaster')
         
         self.declare_parameter('base_link_frame', 'base_link')
         self.base_link_frame = self.get_parameter('base_link_frame').value
         
-        self.declare_parameter('base_footprint_frame', 'base_footprint')
-        self.base_footprint_frame = self.get_parameter('base_footprint_frame').value
+        self.declare_parameter('floor_plane_frame', 'floor_plane')
+        self.floor_plane_frame = self.get_parameter('floor_plane_frame').value
         
         self.calibration = DualLidarCalibration()
         if not self.calibration.load():
@@ -56,7 +56,7 @@ class BaseFootprintBroadcaster(Node):
         ts = TransformStamped()
         ts.header.stamp = self.get_clock().now().to_msg()
         ts.header.frame_id = self.base_link_frame
-        ts.child_frame_id = self.base_footprint_frame
+        ts.child_frame_id = self.floor_plane_frame
         
         ts.transform.translation.x = T_bl_fp[0, 3]
         ts.transform.translation.y = T_bl_fp[1, 3]
@@ -69,11 +69,11 @@ class BaseFootprintBroadcaster(Node):
         ts.transform.rotation.w = quat[3]
         
         self.broadcaster.sendTransform(ts)
-        self.get_logger().info(f"Broadcasted static transform {self.base_link_frame} -> {self.base_footprint_frame}")
+        self.get_logger().info(f"Broadcasted static transform {self.base_link_frame} -> {self.floor_plane_frame}")
 
 def main(args=None):
     rclpy.init(args=args)
-    node = CalibrationBroadcaster()
+    node = FloorPlaneBroadcaster()
     try:
         rclpy.spin(node)
     except SystemExit:
