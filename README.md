@@ -32,7 +32,7 @@ ros2 launch stretch_core dual_hesai.launch.py  filter_type:=sor
 **Preconditions:** Prior to running dual LiDAR alignment calibration, make sure the robot is in a static environment without moving objects. The environment should also have enough geometric structure and size to enable scan matching to find a high-quality rigid body transform between scans taken from the left and right LiDAR.
 
 ```bash
-ros_align_dual_lidar
+ros2 run stretch_dual_lidar_calibration ros_align_dual_lidar
 ```
 
 ### 2. Floor Calibration
@@ -40,7 +40,7 @@ ros_align_dual_lidar
 **Preconditions:** Prior to running the floor calibration method, make sure that the robot is in the middle of a large flat floor that is visible to the robot. The larger, flatter, and more visible the floor is, the better the floor calibration will be.
 
 ```bash
-ros_find_floor_calibration
+ros2 run stretch_dual_lidar_calibration ros_find_floor_calibration
 ```
 
 ### 3. Broadcast Calibration
@@ -48,7 +48,7 @@ ros_find_floor_calibration
 **Preconditions:** Prior to running the visualizer or consuming data, you must broadcast the dual LiDAR alignment and the floor calibrations. You should leave this running in a separate terminal.
 
 ```bash
-ros_broadcast_calibration
+ros2 run stretch_dual_lidar_calibration ros_broadcast_calibration
 ```
 
 ## Visualization
@@ -56,7 +56,7 @@ ros_broadcast_calibration
 A dedicated node has been provided to publish a combined view of all the calibration outputs (unified point cloud, floor inliers):
 
 ```bash
-ros_visualize_calibration
+ros2 run stretch_dual_lidar_calibration ros_visualize_calibration
 ```
 
 You can find the all-in-one RViz configuration in the `rviz` directory showing the unified views:
