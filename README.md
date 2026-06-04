@@ -24,7 +24,7 @@ You should also run the following ros2 launch files in separate terminals:
 ```
 ros2 launch stretch_core stretch_driver.launch.py
 
-ros2 launch stretch_core dual_hesai.launch.py  filter_type:=off
+ros2 launch stretch_core dual_hesai.launch.py  filter_type:=sor
 ```
 
 ### 1. Dual LiDAR Alignment Calibration
