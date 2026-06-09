@@ -10,28 +10,28 @@ import sys
 
 from stretch_dual_lidar_calibration.dual_lidar_calibration import DualLidarCalibration
 
-class CalibrationBroadcaster(Node):
+class FloorPlaneBroadcaster(Node):
     def __init__(self):
-        super().__init__('calibration_broadcaster')
-        
-        self.declare_parameter('base_link_frame', 'base_link')
-        self.base_link_frame = self.get_parameter('base_link_frame').value
+        super().__init__('floor_plane_broadcaster')
         
         self.declare_parameter('base_footprint_frame', 'base_footprint')
         self.base_footprint_frame = self.get_parameter('base_footprint_frame').value
         
-        self.calibration = DualLidarCalibration()
-        if not self.calibration.load():
+        self.declare_parameter('floor_plane_frame', 'floor_plane')
+        self.floor_plane_frame = self.get_parameter('floor_plane_frame').value
+        
+        self.base_footprint_to_base_link_calibration = DualLidarCalibration()
+        if not self.base_footprint_to_base_link_calibration.load():
             self.get_logger().error("Could not load calibration file.")
             sys.exit(1)
             
-        if self.calibration.floor_to_base_link_transform is None:
+        if self.base_footprint_to_base_link_calibration.floor_to_base_link_transform is None:
             self.get_logger().error("Calibration missing floor_to_base_link_transform.")
             sys.exit(1)
             
         self.broadcaster = StaticTransformBroadcaster(self)
         self.broadcast_transforms()
-        
+
     def broadcast_transforms(self):
         # 1. floor_to_base_link_transform (T_fp_bl)
         # P_fp = T_fp_bl * P_bl
@@ -39,41 +39,35 @@ class CalibrationBroadcaster(Node):
         # Msg transform T_msg should satisfy P_bl = T_msg * P_fp
         # So T_msg = inv(T_fp_bl)
         
-        T_fp_bl = self.calibration.floor_to_base_link_transform
+        T_footprint_to_base_link = self.base_footprint_to_base_link_calibration.floor_to_base_link_transform
         
-        # Invert
-        R_fp_bl = T_fp_bl[:3, :3]
-        t_fp_bl = T_fp_bl[:3, 3]
+        # Place holder for a TF perceived live 
+        T_base_link_to_floorplane = np.linalg.inv(T_footprint_to_base_link)
         
-        R_bl_fp = R_fp_bl.T
-        t_bl_fp = -R_bl_fp @ t_fp_bl
-        
-        T_bl_fp = np.eye(4)
-        T_bl_fp[:3, :3] = R_bl_fp
-        T_bl_fp[:3, 3] = t_bl_fp
-        
+        T_footprint_to_floorplane = T_footprint_to_base_link @ T_base_link_to_floorplane
+
         # Create Message
         ts = TransformStamped()
         ts.header.stamp = self.get_clock().now().to_msg()
-        ts.header.frame_id = self.base_link_frame
-        ts.child_frame_id = self.base_footprint_frame
+        ts.header.frame_id = self.base_footprint_frame
+        ts.child_frame_id = self.floor_plane_frame
         
-        ts.transform.translation.x = T_bl_fp[0, 3]
-        ts.transform.translation.y = T_bl_fp[1, 3]
-        ts.transform.translation.z = T_bl_fp[2, 3]
+        ts.transform.translation.x = T_footprint_to_floorplane[0, 3]
+        ts.transform.translation.y = T_footprint_to_floorplane[1, 3]
+        ts.transform.translation.z = T_footprint_to_floorplane[2, 3]
         
-        quat = R.from_matrix(T_bl_fp[:3, :3]).as_quat() # x, y, z, w
+        quat = R.from_matrix(T_footprint_to_floorplane[:3, :3]).as_quat() # x, y, z, w
         ts.transform.rotation.x = quat[0]
         ts.transform.rotation.y = quat[1]
         ts.transform.rotation.z = quat[2]
         ts.transform.rotation.w = quat[3]
-        
+
         self.broadcaster.sendTransform(ts)
-        self.get_logger().info(f"Broadcasted static transform {self.base_link_frame} -> {self.base_footprint_frame}")
+        self.get_logger().info(f"Broadcasted static transform {self.base_footprint_frame} -> {self.floor_plane_frame}")
 
 def main(args=None):
     rclpy.init(args=args)
-    node = CalibrationBroadcaster()
+    node = FloorPlaneBroadcaster()
     try:
         rclpy.spin(node)
     except SystemExit:

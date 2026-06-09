@@ -1,28 +1,26 @@
 #!/usr/bin/env python3
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import PointCloud2
-from message_filters import Subscriber, ApproximateTimeSynchronizer
-import tf2_ros
-import numpy as np
+import argparse
 import os
 import time
-import argparse
-import yaml
-import stretch_body_ii.robot.robot_client as rc
 
-from stretch_dual_lidar_calibration.dual_lidar_calibration import DualLidarCalibration
-from stretch_dual_lidar_calibration.lidar_utils import LidarProcessor
+import numpy as np
+import rclpy
+import stretch4_body.robot.robot_client as rc
+import stretch4_urdf
+import tf2_ros
+import yaml
+from message_filters import ApproximateTimeSynchronizer, Subscriber
+from rclpy.node import Node
+from sensor_msgs.msg import PointCloud2
 
 # Import parameters
 from stretch_dual_lidar_calibration.body_shape_calibration_params import (
-    LIFT_POSITIONS,
-    ARM_POSITIONS,
-    WRIST_YAW_POSITIONS,
-    WRIST_PITCH_POSITIONS,
-    WRIST_ROLL_POSITIONS,
-    SETTLE_TIME_S
-)
+    ARM_POSITIONS, LIFT_POSITIONS, SETTLE_TIME_S, WRIST_PITCH_POSITIONS,
+    WRIST_ROLL_POSITIONS, WRIST_YAW_POSITIONS)
+from stretch_dual_lidar_calibration.dual_lidar_calibration import \
+    DualLidarCalibration
+from stretch_dual_lidar_calibration.lidar_utils import LidarProcessor
+
 
 def convert_to_native(data):
     """Recursively converts numpy types in dictionaries to native python types for clean YAML serialization."""
@@ -90,23 +88,23 @@ class BodyShapeDataCollection(Node):
         status = self.robot.status
         joint_state_dict = {}
         if 'lift' in status:
-            joint_state_dict['joint_lift'] = status['lift']['pos']
+            joint_state_dict['lift_joint'] = status['lift']['pos']
         # stretch_body stores the actual arm extension in 'arm' 
         if 'arm' in status:
-            joint_state_dict['joint_arm'] = status['arm']['pos'] 
+            joint_state_dict['arm_joint'] = status['arm']['pos'] 
         if 'end_of_arm' in status:
             eoa = status['end_of_arm']
             if 'wrist_yaw' in eoa:
-                joint_state_dict['joint_wrist_yaw'] = eoa['wrist_yaw']['pos']
+                joint_state_dict['wrist_yaw_joint'] = eoa['wrist_yaw']['pos']
             if 'wrist_pitch' in eoa:
-                joint_state_dict['joint_wrist_pitch'] = eoa['wrist_pitch']['pos']
+                joint_state_dict['wrist_pitch_joint'] = eoa['wrist_pitch']['pos']
             if 'wrist_roll' in eoa:
-                joint_state_dict['joint_wrist_roll'] = eoa['wrist_roll']['pos']
+                joint_state_dict['wrist_roll_joint'] = eoa['wrist_roll']['pos']
         return joint_state_dict
         
     def wait_until_joint_close(self, joint_name, target, is_eoa=False, threshold=0.015):
         joint_state = self.get_joint_state()
-        val = joint_state.get('joint_arm') if is_eoa else joint_state.get(joint_name, 0.0)
+        val = joint_state.get('arm_joint') if is_eoa else joint_state.get(joint_name, 0.0)
         
         last_print_time = time.time()
         start_time = time.time()
@@ -120,7 +118,7 @@ class BodyShapeDataCollection(Node):
                 break
                 
             joint_state = self.get_joint_state()
-            val = joint_state.get('joint_arm') if is_eoa else joint_state.get(joint_name, 0.0)
+            val = joint_state.get('arm_joint') if is_eoa else joint_state.get(joint_name, 0.0)
             time.sleep(0.05)
 
     def move_to_config(self, lift_pos, arm_pos, wrist_yaw, wrist_pitch, wrist_roll):
@@ -128,36 +126,37 @@ class BodyShapeDataCollection(Node):
         def is_moved(val, target):
             return val is None or abs(val - target) >= 0.015
             
-        if is_moved(state.get('joint_lift'), lift_pos):
+        if is_moved(state.get('lift_joint'), lift_pos):
             self.robot.lift.move_to(lift_pos)
-        if is_moved(state.get('joint_arm'), arm_pos):
+        if is_moved(state.get('arm_joint'), arm_pos):
             self.robot.arm.move_to(arm_pos)
-        if is_moved(state.get('joint_wrist_yaw'), wrist_yaw):
+        if is_moved(state.get('wrist_yaw_joint'), wrist_yaw):
             self.robot.end_of_arm.move_to('wrist_yaw', wrist_yaw)
-        if 'joint_wrist_pitch' in state and is_moved(state.get('joint_wrist_pitch'), wrist_pitch):
+        if 'wrist_pitch_joint' in state and is_moved(state.get('wrist_pitch_joint'), wrist_pitch):
             self.robot.end_of_arm.move_to('wrist_pitch', wrist_pitch)
-        if 'joint_wrist_roll' in state and is_moved(state.get('joint_wrist_roll'), wrist_roll):
+        if 'wrist_roll_joint' in state and is_moved(state.get('wrist_roll_joint'), wrist_roll):
             self.robot.end_of_arm.move_to('wrist_roll', wrist_roll)
             
         self.robot.push_command()
         
-        self.wait_until_joint_close('joint_lift', lift_pos)
-        self.wait_until_joint_close('joint_arm', arm_pos, is_eoa=True)
-        self.wait_until_joint_close('joint_wrist_yaw', wrist_yaw)
-        if 'joint_wrist_pitch' in state:
-            self.wait_until_joint_close('joint_wrist_pitch', wrist_pitch)
-        if 'joint_wrist_roll' in state:
-            self.wait_until_joint_close('joint_wrist_roll', wrist_roll)
+        self.wait_until_joint_close('lift_joint', lift_pos)
+        self.wait_until_joint_close('arm_joint', arm_pos, is_eoa=True)
+        self.wait_until_joint_close('wrist_yaw_joint', wrist_yaw)
+        if 'wrist_pitch_joint' in state:
+            self.wait_until_joint_close('wrist_pitch_joint', wrist_pitch)
+        if 'wrist_roll_joint' in state:
+            self.wait_until_joint_close('wrist_roll_joint', wrist_roll)
             
         # Give time for the robot vibrations to stop
         time.sleep(SETTLE_TIME_S)
         
     def run_collection(self):
-        tool_id = 'unknown'
-        if hasattr(self.robot, 'end_of_arm') and hasattr(self.robot.end_of_arm, 'name'):
-            tool_id = self.robot.end_of_arm.name
-        elif hasattr(self.robot, 'status') and 'end_of_arm' in self.robot.status and 'name' in self.robot.status['end_of_arm']:
-             tool_id = self.robot.status['end_of_arm']['name']
+        try:
+            model_name, batch_name, tool_name = stretch4_urdf.get_robot_params()
+            tool_id = tool_name
+        except Exception as e:
+            self.get_logger().warn(f"Failed to fetch stretch4_urdf robot params: {e}")
+            tool_id = 'unknown'
              
         metadata = {
             'collection_timestamp': time.time(),

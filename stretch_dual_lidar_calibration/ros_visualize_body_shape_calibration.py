@@ -80,8 +80,8 @@ class ShapeCalibrationVisualizerNode(Node):
         self.get_logger().info("Body Shape Calibration Visualizer Node started.")
 
     def joint_states_callback(self, msg):
-        if 'joint_arm' in msg.name:
-            idx = msg.name.index('joint_arm')
+        if 'arm_joint' in msg.name:
+            idx = msg.name.index('arm_joint')
             self.arm_ext = msg.position[idx]
         if 'joint_wrist_yaw' in msg.name:
             idx = msg.name.index('joint_wrist_yaw')

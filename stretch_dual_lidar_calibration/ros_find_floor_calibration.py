@@ -27,7 +27,7 @@ class FloorCalibrationNode(Node):
         self.declare_parameter('base_link_frame', 'base_link')
         self.base_link_frame = self.get_parameter('base_link_frame').value
         
-        self.declare_parameter('left_lidar_frame', 'link_lidar_left')
+        self.declare_parameter('left_lidar_frame', 'lidar_left_link')
         self.left_lidar_frame = self.get_parameter('left_lidar_frame').value
         
         self.declare_parameter('num_samples', 30)
@@ -89,7 +89,7 @@ class FloorCalibrationNode(Node):
             return
             
         # Get TF from Left Lidar to Base Link
-        # We assume Left Lidar points are in 'link_lidar_left' (or whatever left_msg.header.frame_id is?)
+        # We assume Left Lidar points are in 'lidar_left_link' (or whatever left_msg.header.frame_id is?)
         # Let's rely on params or header.
         source_frame = left_msg.header.frame_id if left_msg.header.frame_id else self.left_lidar_frame
         target_frame = self.base_link_frame

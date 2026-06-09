@@ -77,6 +77,43 @@ class DualLidarCalibration:
             else:
                  val = floor_to_base_link_transform
             data['floor_to_base_link_transform'] = pack(val, robot_id, timestamp)
+            
+            # Update stretch_calibration_values.yaml with base_ref joint
+            fleet_id = os.environ.get('HELLO_FLEET_ID','unknown_robot')
+            urdf_calibrated_path = os.path.join(os.path.expanduser('~/stretch_user'), fleet_id, 'stretch_calibration_values.yaml')
+            
+            urdf_data = {'robot_calibration': {'metadata': {'version': '1.0', 'description': 'Calibration values mapped to URDF joints'}, 'joints': {}}}
+            
+            if os.path.exists(urdf_calibrated_path):
+                try:
+                    with open(urdf_calibrated_path, 'r') as f:
+                        loaded_urdf = yaml.safe_load(f)
+                        if loaded_urdf and 'robot_calibration' in loaded_urdf:
+                            urdf_data = loaded_urdf
+                except Exception as e:
+                    print(f"Warning: Failed to load existing URDF calibration values: {e}")
+                    
+            joints = urdf_data['robot_calibration'].setdefault('joints', {})
+            
+            try:
+                base_footprint_to_base_link = np.array(floor_to_base_link_transform)
+                xyz = base_footprint_to_base_link[:3, 3]
+                rpy = R.from_matrix(base_footprint_to_base_link[:3, :3]).as_euler('xyz', degrees=False)
+                xyz_str = f"{float(xyz[0])} {float(xyz[1])} {float(xyz[2])}"
+                rpy_str = f"{float(rpy[0])} {float(rpy[1])} {float(rpy[2])}"
+
+                joints['base_ref'] = {
+                    'xyz': xyz_str,
+                    'rpy': rpy_str,
+                    'parent': 'base_footprint',
+                    'child': 'base_link'
+                }
+                    
+                os.makedirs(os.path.dirname(urdf_calibrated_path), exist_ok=True)
+                with open(urdf_calibrated_path, 'w') as f:
+                    yaml.dump(urdf_data, f, sort_keys=False)
+            except Exception as e:
+                print(f"Warning: Failed to save URDF calibration values: {e}")
 
         if floor_model_params is not None:
             self.floor_model_params = floor_model_params

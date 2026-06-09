@@ -5,40 +5,99 @@ This configuration file defines the parameters used for collecting data, fitting
 and utilizing the dynamically scaling shape body model for the robot.
 """
 import numpy as np
+import stretch4_urdf
+import logging
+
+logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------
 # Data Collection Parameters
 # -----------------------------------------------------------------------------
-
-# Number of samples and ranges for joint configurations
 # These dictate the grid of configurations the robot will move through to collect data.
 
-# Lift positions: [MIN (m), MAX (m), SAMPLES]
-LIFT_CONFIG_RANGE = [0.1, 1.0, 6]
-
-# Arm extensions: [MIN (m), MAX (m), SAMPLES]
-ARM_CONFIG_RANGE = [0.0, 0.49, 6] 
-
-# Wrist yaw (degrees): [MIN (deg), MAX (deg), SAMPLES]
-WRIST_YAW_RANGE = [-60, 120, 6] #[-20.0, 20.0, 3]
-
-# Wrist pitch (degrees): [MIN (deg), MAX (deg), SAMPLES]
-WRIST_PITCH_RANGE = [0.0, 0.0, 1]
-
-# Wrist roll (degrees): [MIN (deg), MAX (deg), SAMPLES]
-WRIST_ROLL_RANGE = [0.0, 0.0, 1]
+# Number of samples to sweep per joint (duplicates will be filtered)
+NUM_SAMPLES = 6
 
 # Delay in seconds to wait after commanding joints before capturing constraints (settle time)
 SETTLE_TIME_S = 0.5
 
-# Generate evenly spaced arrays from the ranges above:
-LIFT_POSITIONS = np.linspace(LIFT_CONFIG_RANGE[0], LIFT_CONFIG_RANGE[1], int(LIFT_CONFIG_RANGE[2])).tolist()
-ARM_POSITIONS = np.linspace(ARM_CONFIG_RANGE[0], ARM_CONFIG_RANGE[1], int(ARM_CONFIG_RANGE[2])).tolist()
+try:
+    urdf_contents = stretch4_urdf.get_urdf_from_robot_params(do_add_file_prefix_to_absolute_paths=False)
+    joint_limits = stretch4_urdf.get_joint_limits(urdf_contents)
+except Exception as e:
+    logger.warning(f"body_shape_calibration_params failed to load URDF params: {e}")
+    joint_limits = {}
 
-# Conversions for wrist angles from degrees to radians
-WRIST_YAW_POSITIONS = np.deg2rad(np.linspace(WRIST_YAW_RANGE[0], WRIST_YAW_RANGE[1], int(WRIST_YAW_RANGE[2]))).tolist()
-WRIST_PITCH_POSITIONS = np.deg2rad(np.linspace(WRIST_PITCH_RANGE[0], WRIST_PITCH_RANGE[1], int(WRIST_PITCH_RANGE[2]))).tolist()
-WRIST_ROLL_POSITIONS = np.deg2rad(np.linspace(WRIST_ROLL_RANGE[0], WRIST_ROLL_RANGE[1], int(WRIST_ROLL_RANGE[2]))).tolist()
+# --- LIFT POSITIONS ---
+# Lift positions: [MIN (m), MAX (m)]
+LIFT_CONFIG_RANGE = [float(0.0), float(0.0)]
+
+if 'lift_joint' in joint_limits:
+    LIFT_CONFIG_RANGE[0] = float(joint_limits['lift_joint'][0])
+    LIFT_CONFIG_RANGE[1] = float(joint_limits['lift_joint'][1])
+else:
+    logger.warning("Joint limit for 'lift_joint' not found in URDF. Using default.")
+logger.info(f"Lift range set to: {LIFT_CONFIG_RANGE}")
+
+LIFT_POSITIONS = np.linspace(LIFT_CONFIG_RANGE[0], LIFT_CONFIG_RANGE[1], NUM_SAMPLES).tolist()
+
+
+# --- ARM EXTENSIONS ---
+# Arm extensions: [MIN (m), MAX (m)]
+ARM_CONFIG_RANGE = [float(0.0), float(0.0)]
+
+for i in range(5): 
+    if f'arm_l{i}_joint' in joint_limits:
+        ARM_CONFIG_RANGE[0] += float(joint_limits[f'arm_l{i}_joint'][0])
+        ARM_CONFIG_RANGE[1] += float(joint_limits[f'arm_l{i}_joint'][1])
+    else:
+        logger.warning(f"Joint limit for 'arm_l{i}_joint' not found in URDF.")
+
+logger.info(f"Arm range set to: {ARM_CONFIG_RANGE}")
+
+ARM_POSITIONS = np.linspace(ARM_CONFIG_RANGE[0], ARM_CONFIG_RANGE[1], NUM_SAMPLES).tolist()
+
+
+# --- WRIST YAW ---
+# Wrist yaw (degrees): [MIN (deg), MAX (deg)]
+WRIST_YAW_RANGE = [float(-60.0), float(120.0)]
+
+if 'wrist_yaw_joint' in joint_limits:
+    WRIST_YAW_RANGE[0] = float(np.rad2deg(joint_limits['wrist_yaw_joint'][0]))
+    WRIST_YAW_RANGE[1] = float(np.rad2deg(joint_limits['wrist_yaw_joint'][1]))
+else:
+    logger.warning("Joint limit for 'wrist_yaw_joint' not found in URDF. Using default.")
+logger.info(f"Wrist Yaw range set to: {WRIST_YAW_RANGE}")
+
+WRIST_YAW_POSITIONS = np.deg2rad(np.linspace(WRIST_YAW_RANGE[0], WRIST_YAW_RANGE[1], NUM_SAMPLES)).tolist()
+
+
+# --- WRIST PITCH ---
+# Wrist pitch (degrees): [MIN (deg), MAX (deg)]
+WRIST_PITCH_RANGE = [float(0.0), float(0.0)]
+
+if 'wrist_pitch_joint' in joint_limits:
+    WRIST_PITCH_RANGE[0] = float(np.rad2deg(joint_limits['wrist_pitch_joint'][0]))
+    WRIST_PITCH_RANGE[1] = float(np.rad2deg(joint_limits['wrist_pitch_joint'][1]))
+else:
+    logger.warning("Joint limit for 'wrist_pitch_joint' not found in URDF. Using default.")
+logger.info(f"Wrist Pitch range set to: {WRIST_PITCH_RANGE}")
+
+WRIST_PITCH_POSITIONS = np.deg2rad(np.linspace(WRIST_PITCH_RANGE[0], WRIST_PITCH_RANGE[1], NUM_SAMPLES)).tolist()
+
+
+# --- WRIST ROLL ---
+# Wrist roll (degrees): [MIN (deg), MAX (deg)]
+WRIST_ROLL_RANGE = [float(0.0), float(0.0)]
+
+if 'wrist_roll_joint' in joint_limits:
+    WRIST_ROLL_RANGE[0] = float(np.rad2deg(joint_limits['wrist_roll_joint'][0]))
+    WRIST_ROLL_RANGE[1] = float(np.rad2deg(joint_limits['wrist_roll_joint'][1]))
+else:
+    logger.warning("Joint limit for 'wrist_roll_joint' not found in URDF. Using default.")
+logger.info(f"Wrist Roll range set to: {WRIST_ROLL_RANGE}")
+
+WRIST_ROLL_POSITIONS = np.deg2rad(np.linspace(WRIST_ROLL_RANGE[0], WRIST_ROLL_RANGE[1], NUM_SAMPLES)).tolist()
 
 
 # -----------------------------------------------------------------------------
@@ -99,3 +158,5 @@ STOP_ZONE_M = 0.1           # Added to the margin to form the outer boundary `ou
 MIN_POSITIVE_OBSTACLE_HEIGHT_M = 0.06
 MAX_POSITIVE_OBSTACLE_HEIGHT_M = 1.6
 MAX_NEGATIVE_OBSTACLE_HEIGHT_M = -0.06
+
+
