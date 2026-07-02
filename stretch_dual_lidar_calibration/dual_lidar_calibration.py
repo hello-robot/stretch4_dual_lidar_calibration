@@ -71,7 +71,12 @@ class DualLidarCalibration:
                  val = right_to_left_transform.tolist()
             else:
                  val = right_to_left_transform
-            data['right_to_left_transform'] = pack(val, robot_id, timestamp)
+            
+            extra_meta = {}
+            if fit_method: extra_meta['fit_method'] = fit_method
+            if rmse: extra_meta['rmse'] = float(rmse)
+            
+            data['right_to_left_transform'] = pack(val, robot_id, timestamp, extra=extra_meta)
             
         if floor_to_base_link_transform is not None:
             self.floor_to_base_link_transform = floor_to_base_link_transform
@@ -146,9 +151,11 @@ class DualLidarCalibration:
                 'distance': p[3],
                 'description': 'Floor plane: normal [x,y,z] dot point + distance = 0'
             }
-            data['floor_model_params'] = pack(val, robot_id, timestamp)
+            extra_meta = {}
+            if fit_method: extra_meta['fit_method'] = fit_method
+            if rmse: extra_meta['rmse'] = float(rmse)
             
-            data['floor_model_params'] = pack(val, robot_id, timestamp)
+            data['floor_model_params'] = pack(val, robot_id, timestamp, extra=extra_meta)
             
         try:
             os.makedirs(os.path.dirname(self.filename), exist_ok=True)
