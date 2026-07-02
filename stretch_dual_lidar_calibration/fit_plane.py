@@ -321,7 +321,12 @@ def fit_floor_iterative(points, verbose=True, fit_method='least_squares'):
     T[:3, :3] = R.T
     T[:3, 3] = -R.T @ t
     
-    return T, [final_normal[0], final_normal[1], final_normal[2], d_final]
+    # 6. Calculate RMSE
+    # dist = dot(p - t, final_normal)
+    final_dist = np.dot(final_inliers - t, final_normal)
+    rmse = np.sqrt(np.mean(final_dist**2))
+    
+    return T, [final_normal[0], final_normal[1], final_normal[2], d_final], rmse
 
 class FitPlane():
     def __init__(self):

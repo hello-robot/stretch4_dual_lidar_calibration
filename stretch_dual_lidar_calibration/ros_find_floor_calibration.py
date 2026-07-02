@@ -151,8 +151,8 @@ class FloorCalibrationNode(Node):
              indices = np.random.choice(all_points.shape[0], 100000, replace=False)
              all_points = all_points[indices]
              
-        T, params = fit_plane.fit_floor_iterative(all_points, verbose=True, fit_method=self.fit_method)
-        self.finish(T, params)
+        T, params, rmse = fit_plane.fit_floor_iterative(all_points, verbose=True, fit_method=self.fit_method)
+        self.finish(T, params, rmse)
         
     def process_mid_transforms(self):
         self.get_logger().info("Averaging transforms...")
@@ -189,15 +189,23 @@ class FloorCalibrationNode(Node):
         
         params = [Z_f[0], Z_f[1], Z_f[2], d]
         
-        self.finish(T_avg, params)
+        # For averaged transforms, RMSE is harder to define without original points.
+        # We'll use None or 0.0 for now if averaging.
+        self.finish(T_avg, params, rmse=None)
 
-    def finish(self, transform, params):
+    def finish(self, transform, params, rmse=None):
         self.get_logger().info("Floor calibration finished.")
         self.get_logger().info(f"Transform:\n{transform}")
         self.get_logger().info(f"Params: {params}")
+        if rmse is not None:
+             self.get_logger().info(f"RMSE: {rmse:.6f} m")
         
         robot_id = os.environ.get('HELLO_FLEET_ID', 'unknown_robot')
-        if self.calibration.save(floor_to_base_link_transform=transform, floor_model_params=params, robot_id=robot_id):
+        if self.calibration.save(floor_to_base_link_transform=transform, 
+                                 floor_model_params=params, 
+                                 robot_id=robot_id,
+                                 fit_method=self.fit_method,
+                                 rmse=rmse):
             self.get_logger().info("Saved to dual_lidar_calibration.yaml")
         else:
             self.get_logger().error("Failed to save.")

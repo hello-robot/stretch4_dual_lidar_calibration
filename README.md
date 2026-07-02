@@ -141,7 +141,7 @@ The first step is to find the static rigid body transform between the two LiDARs
 - **Data Collection**: The script collects synchronized scan pairs from both LiDARs.
 - **Registration**: It uses **small_gicp** (Generalized Iterative Closest Point) to register the point cloud from the right LiDAR to the left LiDAR's frame.
 - **Averaging**: To ensure robustness, the script performs this registration across multiple frames (default: 100 samples) and computes the average transform.
-- **Result**: The computed transform is saved as `right_to_left_transform` in `dual_lidar_calibration.yaml`.
+- **Result**: The computed transform is saved as `right_to_left_transform` in `dual_lidar_calibration.yaml` (located in the stretch_user calibration_dual_lidar directory).
 
 ### 2. Floor Plane Calibration (`ros_find_floor_calibration.py`)
 
@@ -157,7 +157,7 @@ The second step is to determine the floor plane relative to the robot's base lin
   - Its origin is on the floor plane, directly below the `base_link` origin.
   - Its Z-axis is aligned with the floor normal.
   - Its X-axis is aligned with the projection of the `base_link` X-axis onto the floor.
-- **Result**: The transform `floor_to_base_link_transform` is saved to `dual_lidar_calibration.yaml`. This transform maps points from the `base_link` frame to the `base_footprint` frame.
+- **Result**: This transform maps points from the `base_link` frame to the `base_footprint` frame. The transform `floor_to_base_link_transform` is saved to `dual_lidar_calibration.yaml` and as a static calibration value (the `base_ref` joint) in `stretch_calibration_values.yaml`.
 
 ## Body Shape Modeling
 
@@ -230,7 +230,7 @@ rviz2 -d ./rviz/body_shape_calibration.rviz
 
 stretch_robosense makes use of [small_gicp](https://github.com/koide3/small_gicp), which is a library for fast 3D lidar scan registration. Kenji Koide from National Institute of Advanced Industrial Science and Technology (AIST) is the creator of small_gicp. The repository was released in 2024 with an MIT License.
 
-If you use small_gicp as part of stretch_dual_lidar, please cite it using the following citation and consider leaving a comment [here](https://github.com/koide3/small_gicp/issues/) as requested by Kenji Koide. _"It would help the author receive recognition in his organization and keep working on this project."_ - [small_gicp GitHub repository](https://github.com/koide3/small_gicp),
+If you use small*gicp as part of stretch_dual_lidar, please cite it using the following citation and consider leaving a comment [here](https://github.com/koide3/small_gicp/issues/) as requested by Kenji Koide. *"It would help the author receive recognition in his organization and keep working on this project."\_ - [small_gicp GitHub repository](https://github.com/koide3/small_gicp),
 
 ```
 @article{small_gicp,

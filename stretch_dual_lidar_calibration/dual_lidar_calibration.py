@@ -42,7 +42,7 @@ class DualLidarCalibration:
                 # Older pyyaml
                 return yaml.load(content)
 
-    def save(self, right_to_left_transform=None, floor_to_base_link_transform=None, floor_model_params=None, robot_id=None):
+    def save(self, right_to_left_transform=None, floor_to_base_link_transform=None, floor_model_params=None, robot_id=None, fit_method=None, rmse=None):
         """
         Save the calibration data to a YAML file.
         Updates provided fields, keeps existing ones if not provided.
@@ -59,8 +59,11 @@ class DualLidarCalibration:
         data = current_data
         timestamp = datetime.now().isoformat()
         
-        def pack(val, rid, ts):
-            return {'data': val, 'robot_id': rid, 'timestamp': ts}
+        def pack(val, rid, ts, extra=None):
+            d = {'data': val, 'robot_id': rid, 'timestamp': ts}
+            if extra:
+                d.update(extra)
+            return d
 
         if right_to_left_transform is not None:
             self.right_to_left_transform = right_to_left_transform
@@ -76,7 +79,12 @@ class DualLidarCalibration:
                  val = floor_to_base_link_transform.tolist()
             else:
                  val = floor_to_base_link_transform
-            data['floor_to_base_link_transform'] = pack(val, robot_id, timestamp)
+            
+            extra_meta = {}
+            if fit_method: extra_meta['fit_method'] = fit_method
+            if rmse: extra_meta['rmse'] = float(rmse)
+            
+            data['floor_to_base_link_transform'] = pack(val, robot_id, timestamp, extra=extra_meta)
             
             # Update stretch_calibration_values.yaml with base_ref joint
             fleet_id = os.environ.get('HELLO_FLEET_ID','unknown_robot')
@@ -106,7 +114,13 @@ class DualLidarCalibration:
                     'xyz': xyz_str,
                     'rpy': rpy_str,
                     'parent': 'base_footprint',
-                    'child': 'base_link'
+                    'child': 'base_link',
+                    'metadata': {
+                        'robot_id': robot_id,
+                        'timestamp': timestamp,
+                        'fit_method': fit_method,
+                        'rmse': float(rmse) if rmse is not None else None
+                    }
                 }
                     
                 os.makedirs(os.path.dirname(urdf_calibrated_path), exist_ok=True)
