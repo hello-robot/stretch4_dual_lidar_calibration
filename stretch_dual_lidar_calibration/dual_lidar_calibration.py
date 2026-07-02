@@ -100,24 +100,19 @@ class DualLidarCalibration:
                 xyz_str = f"{float(xyz[0])} {float(xyz[1])} {float(xyz[2])}"
                 rpy_str = f"{float(rpy[0])} {float(rpy[1])} {float(rpy[2])}"
 
-                try:
-                    fleet_id = os.environ.get('HELLO_FLEET_ID','unknown_robot')
-                    urdf_calibrated_path = os.path.join(os.path.expanduser('~/stretch_user'), fleet_id, 'stretch_calibration_values.yaml')
-                    record_joint_calibration(
-                        joint_name='base_ref',
-                        xyz=xyz_str,
-                        rpy=rpy_str,
-                        parent='base_footprint',
-                        child='base_link',
-                        robot_id=robot_id,
-                        timestamp=timestamp,
-                        extra=extra_meta,
-                        filepath=urdf_calibrated_path
-                    )
-                except ImportError:
-                    print("Warning: stretch4_urdf package not found. Cannot update stretch_calibration_values.yaml.")
+                record_joint_calibration(
+                    joint_name='base_ref',
+                    xyz=xyz_str,
+                    rpy=rpy_str,
+                    parent='base_footprint',
+                    child='base_link',
+                    robot_id=robot_id,
+                    timestamp=timestamp,
+                    extra=extra_meta
+                )
+
             except Exception as e:
-                print(f"Warning: Failed to compute/save URDF calibration values: {e}")
+                print(f"Warning: Failed to compute and save URDF calibration values: {e}")
 
         if floor_model_params is not None:
             self.floor_model_params = floor_model_params
