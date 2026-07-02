@@ -238,7 +238,7 @@ rviz2 -d ./rviz/body_shape_calibration.rviz
 
 stretch_robosense makes use of [small_gicp](https://github.com/koide3/small_gicp), which is a library for fast 3D lidar scan registration. Kenji Koide from National Institute of Advanced Industrial Science and Technology (AIST) is the creator of small_gicp. The repository was released in 2024 with an MIT License.
 
-If you use small*gicp as part of stretch_dual_lidar, please cite it using the following citation and consider leaving a comment [here](https://github.com/koide3/small_gicp/issues/) as requested by Kenji Koide. *"It would help the author receive recognition in his organization and keep working on this project."\_ - [small_gicp GitHub repository](https://github.com/koide3/small_gicp),
+If you use small_gicp as part of stretch_dual_lidar, please cite it using the following citation and consider leaving a comment [here](https://github.com/koide3/small_gicp/issues/) as requested by Kenji Koide. *"It would help the author receive recognition in his organization and keep working on this project."\_ - [small_gicp GitHub repository](https://github.com/koide3/small_gicp),
 
 ```
 @article{small_gicp,
