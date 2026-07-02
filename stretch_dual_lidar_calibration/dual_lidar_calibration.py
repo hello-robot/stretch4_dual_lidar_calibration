@@ -3,6 +3,7 @@ from scipy.spatial.transform import Rotation as R
 import numpy as np
 import os
 import yaml
+from stretch4_urdf import record_joint_calibration
 
 class DualLidarCalibration:
     def __init__(self, filename=None):
@@ -42,7 +43,7 @@ class DualLidarCalibration:
                 # Older pyyaml
                 return yaml.load(content)
 
-    def save(self, right_to_left_transform=None, floor_to_base_link_transform=None, floor_model_params=None, robot_id=None):
+    def save(self, right_to_left_transform=None, floor_to_base_link_transform=None, floor_model_params=None, robot_id=None, fit_method=None, rmse=None):
         """
         Save the calibration data to a YAML file.
         Updates provided fields, keeps existing ones if not provided.
@@ -59,8 +60,11 @@ class DualLidarCalibration:
         data = current_data
         timestamp = datetime.now().isoformat()
         
-        def pack(val, rid, ts):
-            return {'data': val, 'robot_id': rid, 'timestamp': ts}
+        def pack(val, rid, ts, extra=None):
+            d = {'data': val, 'robot_id': rid, 'timestamp': ts}
+            if extra:
+                d.update(extra)
+            return d
 
         if right_to_left_transform is not None:
             self.right_to_left_transform = right_to_left_transform
@@ -68,7 +72,12 @@ class DualLidarCalibration:
                  val = right_to_left_transform.tolist()
             else:
                  val = right_to_left_transform
-            data['right_to_left_transform'] = pack(val, robot_id, timestamp)
+            
+            extra_meta = {}
+            if fit_method: extra_meta['fit_method'] = fit_method
+            if rmse: extra_meta['rmse'] = float(rmse)
+            
+            data['right_to_left_transform'] = pack(val, robot_id, timestamp, extra=extra_meta)
             
         if floor_to_base_link_transform is not None:
             self.floor_to_base_link_transform = floor_to_base_link_transform
@@ -76,44 +85,34 @@ class DualLidarCalibration:
                  val = floor_to_base_link_transform.tolist()
             else:
                  val = floor_to_base_link_transform
-            data['floor_to_base_link_transform'] = pack(val, robot_id, timestamp)
             
-            # Update stretch_calibration_values.yaml with base_ref joint
-            fleet_id = os.environ.get('HELLO_FLEET_ID','unknown_robot')
-            urdf_calibrated_path = os.path.join(os.path.expanduser('~/stretch_user'), fleet_id, 'stretch_calibration_values.yaml')
+            extra_meta = {}
+            if fit_method: extra_meta['fit_method'] = fit_method
+            if rmse: extra_meta['rmse'] = float(rmse)
             
-            urdf_data = {'robot_calibration': {'metadata': {'version': '1.0', 'description': 'Calibration values mapped to URDF joints'}, 'joints': {}}}
-            
-            if os.path.exists(urdf_calibrated_path):
-                try:
-                    with open(urdf_calibrated_path, 'r') as f:
-                        loaded_urdf = yaml.safe_load(f)
-                        if loaded_urdf and 'robot_calibration' in loaded_urdf:
-                            urdf_data = loaded_urdf
-                except Exception as e:
-                    print(f"Warning: Failed to load existing URDF calibration values: {e}")
-                    
-            joints = urdf_data['robot_calibration'].setdefault('joints', {})
+            data['floor_to_base_link_transform'] = pack(val, robot_id, timestamp, extra=extra_meta)
             
             try:
+                # Update stretch_calibration_values.yaml with base_ref joint
                 base_footprint_to_base_link = np.array(floor_to_base_link_transform)
                 xyz = base_footprint_to_base_link[:3, 3]
                 rpy = R.from_matrix(base_footprint_to_base_link[:3, :3]).as_euler('xyz', degrees=False)
                 xyz_str = f"{float(xyz[0])} {float(xyz[1])} {float(xyz[2])}"
                 rpy_str = f"{float(rpy[0])} {float(rpy[1])} {float(rpy[2])}"
 
-                joints['base_ref'] = {
-                    'xyz': xyz_str,
-                    'rpy': rpy_str,
-                    'parent': 'base_footprint',
-                    'child': 'base_link'
-                }
-                    
-                os.makedirs(os.path.dirname(urdf_calibrated_path), exist_ok=True)
-                with open(urdf_calibrated_path, 'w') as f:
-                    yaml.dump(urdf_data, f, sort_keys=False)
+                record_joint_calibration(
+                    joint_name='base_ref',
+                    xyz=xyz_str,
+                    rpy=rpy_str,
+                    parent='base_footprint',
+                    child='base_link',
+                    robot_id=robot_id,
+                    timestamp=timestamp,
+                    extra=extra_meta
+                )
+
             except Exception as e:
-                print(f"Warning: Failed to save URDF calibration values: {e}")
+                print(f"Warning: Failed to compute and save URDF calibration values: {e}")
 
         if floor_model_params is not None:
             self.floor_model_params = floor_model_params
@@ -132,9 +131,11 @@ class DualLidarCalibration:
                 'distance': p[3],
                 'description': 'Floor plane: normal [x,y,z] dot point + distance = 0'
             }
-            data['floor_model_params'] = pack(val, robot_id, timestamp)
+            extra_meta = {}
+            if fit_method: extra_meta['fit_method'] = fit_method
+            if rmse: extra_meta['rmse'] = float(rmse)
             
-            data['floor_model_params'] = pack(val, robot_id, timestamp)
+            data['floor_model_params'] = pack(val, robot_id, timestamp, extra=extra_meta)
             
         try:
             os.makedirs(os.path.dirname(self.filename), exist_ok=True)

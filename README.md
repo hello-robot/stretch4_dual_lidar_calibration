@@ -22,6 +22,8 @@ Prior to running body calibration, stow the robot’s arm by lowering the lift, 
 You should also run the following ros2 launch files in separate terminals:
 
 ```
+ros2 run rmw_zenoh_cpp rmw_zenohd
+
 ros2 launch stretch_core stretch_driver.launch.py
 
 ros2 launch stretch_core dual_hesai.launch.py  filter_type:=sor
@@ -80,54 +82,60 @@ An example of a calibration YAML file follows:
 ```yaml
 right_to_left_transform:
   data:
-    - - -0.5365967222717024
-      - 0.6663353592972918
-      - -0.5177462183323179
-      - -0.12294484016345666
-    - - -0.6646750085371393
-      - 0.04424751619601933
-      - 0.7458212187492647
-      - 0.21060627682335334
-    - - 0.5198760339479219
-      - 0.7443381934716462
-      - 0.4191533884700769
-      - -0.11890210541737793
-    - - 0.0
-      - 0.0
-      - 0.0
-      - 1.0
+  - - -0.5377963718346568
+    - 0.6648722076819781
+    - -0.5183821079990824
+    - -0.10937678240418136
+  - - -0.6615787778171399
+    - 0.048309946411164574
+    - 0.748317893558433
+    - 0.18978458559800884
+  - - 0.5225787817960651
+    - 0.7453932495869836
+    - 0.4138844286593757
+    - -0.09976708265415501
+  - - 0.0
+    - 0.0
+    - 0.0
+    - 1.0
   robot_id: stretch-se4-4010
-  timestamp: "2026-03-19T14:28:32.548974"
+  timestamp: '2026-07-02T11:44:40.651212'
+  fit_method: gicp
+  rmse: 0.6766259118614343
 floor_to_base_link_transform:
   data:
-    - - 0.9999523981086859
-      - 0.00018263214746540911
-      - -0.009755417068829098
-      - -2.710505431213761e-20
-    - - 0.0
-      - 0.9998248062402024
-      - 0.018717821100267065
-      - 5.421010862427522e-20
-    - - 0.00975712645649783
-      - -0.018716930096581413
-      - 0.9997772126884428
-      - 0.013265772694061559
-    - - 0.0
-      - 0.0
-      - 0.0
-      - 1.0
+  - - 0.9999643043180069
+    - -2.4448049205598682e-05
+    - 0.008449230266551321
+    - 0.0
+  - - 0.0
+    - 0.9999958137861803
+    - 0.002893511727052981
+    - 1.3552527156068805e-20
+  - - -0.008449265636983897
+    - -0.0028934084411785296
+    - 0.9999601182536172
+    - 0.026050630323511632
+  - - 0.0
+    - 0.0
+    - 0.0
+    - 1.0
   robot_id: stretch-se4-4010
-  timestamp: "2026-03-19T13:45:26.138201"
+  timestamp: '2026-07-02T11:45:43.001395'
+  fit_method: svd
+  rmse: 0.011044131704765942
 floor_model_params:
   data:
     normal:
-      - 0.00975712645649783
-      - -0.018716930096581413
-      - 0.9997772126884428
-    distance: -0.013265772694061559
-    description: "Floor plane: normal [x,y,z] dot point + distance = 0"
+    - -0.008449265636983897
+    - -0.0028934084411785296
+    - 0.9999601182536172
+    distance: -0.026050630323511636
+    description: 'Floor plane: normal [x,y,z] dot point + distance = 0'
   robot_id: stretch-se4-4010
-  timestamp: "2026-03-19T13:45:26.138201"
+  timestamp: '2026-07-02T11:45:43.001395'
+  fit_method: svd
+  rmse: 0.011044131704765942
 ```
 
 ## Calibration Details
@@ -141,7 +149,7 @@ The first step is to find the static rigid body transform between the two LiDARs
 - **Data Collection**: The script collects synchronized scan pairs from both LiDARs.
 - **Registration**: It uses **small_gicp** (Generalized Iterative Closest Point) to register the point cloud from the right LiDAR to the left LiDAR's frame.
 - **Averaging**: To ensure robustness, the script performs this registration across multiple frames (default: 100 samples) and computes the average transform.
-- **Result**: The computed transform is saved as `right_to_left_transform` in `dual_lidar_calibration.yaml`.
+- **Result**: The computed transform is saved as `right_to_left_transform` in `dual_lidar_calibration.yaml` (located in the stretch_user calibration_dual_lidar directory).
 
 ### 2. Floor Plane Calibration (`ros_find_floor_calibration.py`)
 
@@ -157,7 +165,7 @@ The second step is to determine the floor plane relative to the robot's base lin
   - Its origin is on the floor plane, directly below the `base_link` origin.
   - Its Z-axis is aligned with the floor normal.
   - Its X-axis is aligned with the projection of the `base_link` X-axis onto the floor.
-- **Result**: The transform `floor_to_base_link_transform` is saved to `dual_lidar_calibration.yaml`. This transform maps points from the `base_link` frame to the `base_footprint` frame.
+- **Result**: This transform maps points from the `base_link` frame to the `base_footprint` frame. The transform `floor_to_base_link_transform` is saved to `dual_lidar_calibration.yaml` and as a static calibration value (the `base_ref` joint) in `stretch_calibration_values.yaml`.
 
 ## Body Shape Modeling
 
@@ -230,7 +238,7 @@ rviz2 -d ./rviz/body_shape_calibration.rviz
 
 stretch_robosense makes use of [small_gicp](https://github.com/koide3/small_gicp), which is a library for fast 3D lidar scan registration. Kenji Koide from National Institute of Advanced Industrial Science and Technology (AIST) is the creator of small_gicp. The repository was released in 2024 with an MIT License.
 
-If you use small_gicp as part of stretch_dual_lidar, please cite it using the following citation and consider leaving a comment [here](https://github.com/koide3/small_gicp/issues/) as requested by Kenji Koide. _"It would help the author receive recognition in his organization and keep working on this project."_ - [small_gicp GitHub repository](https://github.com/koide3/small_gicp),
+If you use small_gicp as part of stretch_dual_lidar, please cite it using the following citation and consider leaving a comment [here](https://github.com/koide3/small_gicp/issues/) as requested by Kenji Koide. *"It would help the author receive recognition in his organization and keep working on this project."\_ - [small_gicp GitHub repository](https://github.com/koide3/small_gicp),
 
 ```
 @article{small_gicp,

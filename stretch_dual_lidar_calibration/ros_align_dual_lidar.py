@@ -1,20 +1,21 @@
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import PointCloud2, PointField
-from std_msgs.msg import Header
-from sensor_msgs_py import point_cloud2
-from message_filters import Subscriber, ApproximateTimeSynchronizer
-import tf2_ros
-from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
-import numpy as np
-import scipy.spatial.transform
-import yaml
-import sys
 import os
+import sys
+
+import numpy as np
+import rclpy
+import scipy.spatial.transform
+import tf2_ros
+from message_filters import ApproximateTimeSynchronizer, Subscriber
+from rclpy.node import Node
+from scipy.spatial import KDTree
+from sensor_msgs.msg import PointCloud2
+from sensor_msgs_py import point_cloud2
 
 # Import local scan_matcher
 import stretch_dual_lidar_calibration.scan_matcher as sm
-from stretch_dual_lidar_calibration.dual_lidar_calibration import DualLidarCalibration
+from stretch_dual_lidar_calibration.dual_lidar_calibration import \
+    DualLidarCalibration
+
 
 class DualLidarCalibrator(Node):
     def __init__(self):
@@ -57,6 +58,7 @@ class DualLidarCalibrator(Node):
         
         # Calibration State
         self.corrective_transforms = []
+        self.rmses = []
         self.T_dom = None # Initial transform from TF
         self.T_final = None # Final calibrated transform
         
@@ -156,9 +158,23 @@ class DualLidarCalibrator(Node):
             result = self.scan_matcher.estimate_transform(right_points_in_left, left_points)
             T_corr = result.T_target_source
             
-            self.corrective_transforms.append(T_corr)
+            # Calculate RMSE for this sample
+            # Transform source points by T_corr
+            R_corr = T_corr[:3, :3]
+            t_corr = T_corr[:3, 3]
+            aligned_points = (R_corr @ right_points_in_left.T).T + t_corr
             
-            self.get_logger().info(f"Sample {len(self.corrective_transforms)}/{self.num_samples} collected.")
+            # Find nearest neighbors in target cloud for RMSE
+            # We can use a simple KDTree or just rely on fitness if small_gicp provided it.
+            # To be safe and independent of small_gicp version, we calculate it here.
+            tree = KDTree(left_points)
+            dists, _ = tree.query(aligned_points, k=1)
+            rmse = np.sqrt(np.mean(dists**2))
+            
+            self.corrective_transforms.append(T_corr)
+            self.rmses.append(rmse)
+            
+            self.get_logger().info(f"Sample {len(self.corrective_transforms)}/{self.num_samples} collected. RMSE: {rmse:.6f} m")
             
             if len(self.corrective_transforms) >= self.num_samples:
                 self.finish_calibration()
@@ -170,6 +186,7 @@ class DualLidarCalibrator(Node):
         self.get_logger().info("Computing average transform...")
         
         T_avg = self.calib_helper.average_homogeneous_transforms(self.corrective_transforms)
+        avg_rmse = np.mean(self.rmses) if self.rmses else None
         
         # Final transform T_total = T_avg * T_dom
         # Meaning: P_left = T_avg * (T_dom * P_right)
@@ -180,11 +197,16 @@ class DualLidarCalibrator(Node):
         self.get_logger().info(f"Initial TF:\n{self.T_dom}")
         self.get_logger().info(f"Corrective:\n{T_avg}")
         self.get_logger().info(f"Final Transform (Right -> Left):\n{self.T_final}")
-
+        if avg_rmse is not None:
+             self.get_logger().info(f"Average RMSE: {avg_rmse:.6f} m")
+             
         # Save to YAML
         # Use the helper class to save
         robot_id = os.environ.get('HELLO_FLEET_ID', 'unknown_robot')
-        self.calib_helper.save(right_to_left_transform=self.T_final, robot_id=robot_id)
+        self.calib_helper.save(right_to_left_transform=self.T_final, 
+                               robot_id=robot_id,
+                               fit_method='gicp',
+                               rmse=avg_rmse)
         self.get_logger().info(f"Saved calibration to {os.path.abspath(self.calib_helper.filename)}")
         
         self.state = "finished"
