@@ -3,6 +3,7 @@ from scipy.spatial.transform import Rotation as R
 import numpy as np
 import os
 import yaml
+from stretch4_urdf import record_joint_calibration
 
 class DualLidarCalibration:
     def __init__(self, filename=None):
@@ -91,48 +92,32 @@ class DualLidarCalibration:
             
             data['floor_to_base_link_transform'] = pack(val, robot_id, timestamp, extra=extra_meta)
             
-            # Update stretch_calibration_values.yaml with base_ref joint
-            fleet_id = os.environ.get('HELLO_FLEET_ID','unknown_robot')
-            urdf_calibrated_path = os.path.join(os.path.expanduser('~/stretch_user'), fleet_id, 'stretch_calibration_values.yaml')
-            
-            urdf_data = {'robot_calibration': {'metadata': {'version': '1.0', 'description': 'Calibration values mapped to URDF joints'}, 'joints': {}}}
-            
-            if os.path.exists(urdf_calibrated_path):
-                try:
-                    with open(urdf_calibrated_path, 'r') as f:
-                        loaded_urdf = yaml.safe_load(f)
-                        if loaded_urdf and 'robot_calibration' in loaded_urdf:
-                            urdf_data = loaded_urdf
-                except Exception as e:
-                    print(f"Warning: Failed to load existing URDF calibration values: {e}")
-                    
-            joints = urdf_data['robot_calibration'].setdefault('joints', {})
-            
             try:
+                # Update stretch_calibration_values.yaml with base_ref joint
                 base_footprint_to_base_link = np.array(floor_to_base_link_transform)
                 xyz = base_footprint_to_base_link[:3, 3]
                 rpy = R.from_matrix(base_footprint_to_base_link[:3, :3]).as_euler('xyz', degrees=False)
                 xyz_str = f"{float(xyz[0])} {float(xyz[1])} {float(xyz[2])}"
                 rpy_str = f"{float(rpy[0])} {float(rpy[1])} {float(rpy[2])}"
 
-                joints['base_ref'] = {
-                    'xyz': xyz_str,
-                    'rpy': rpy_str,
-                    'parent': 'base_footprint',
-                    'child': 'base_link',
-                    'metadata': {
-                        'robot_id': robot_id,
-                        'timestamp': timestamp,
-                        'fit_method': fit_method,
-                        'rmse': float(rmse) if rmse is not None else None
-                    }
-                }
-                    
-                os.makedirs(os.path.dirname(urdf_calibrated_path), exist_ok=True)
-                with open(urdf_calibrated_path, 'w') as f:
-                    yaml.dump(urdf_data, f, sort_keys=False)
+                try:
+                    fleet_id = os.environ.get('HELLO_FLEET_ID','unknown_robot')
+                    urdf_calibrated_path = os.path.join(os.path.expanduser('~/stretch_user'), fleet_id, 'stretch_calibration_values.yaml')
+                    record_joint_calibration(
+                        joint_name='base_ref',
+                        xyz=xyz_str,
+                        rpy=rpy_str,
+                        parent='base_footprint',
+                        child='base_link',
+                        robot_id=robot_id,
+                        timestamp=timestamp,
+                        extra=extra_meta,
+                        filepath=urdf_calibrated_path
+                    )
+                except ImportError:
+                    print("Warning: stretch4_urdf package not found. Cannot update stretch_calibration_values.yaml.")
             except Exception as e:
-                print(f"Warning: Failed to save URDF calibration values: {e}")
+                print(f"Warning: Failed to compute/save URDF calibration values: {e}")
 
         if floor_model_params is not None:
             self.floor_model_params = floor_model_params
