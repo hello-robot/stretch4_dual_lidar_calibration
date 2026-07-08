@@ -79,6 +79,28 @@ class DualLidarCalibration:
             
             data['right_to_left_transform'] = pack(val, robot_id, timestamp, extra=extra_meta)
             
+            try:
+                # Update stretch_calibration_values.yaml with lidar_right_joint
+                transform_matrix = np.array(right_to_left_transform)
+                xyz = transform_matrix[:3, 3]
+                rpy = R.from_matrix(transform_matrix[:3, :3]).as_euler('xyz', degrees=False)
+                xyz_str = f"{float(xyz[0])} {float(xyz[1])} {float(xyz[2])}"
+                rpy_str = f"{float(rpy[0])} {float(rpy[1])} {float(rpy[2])}"
+
+                record_joint_calibration(
+                    joint_name='lidar_right_joint',
+                    xyz=xyz_str,
+                    rpy=rpy_str,
+                    parent='lidar_left_link',
+                    child='lidar_right_link',
+                    robot_id=robot_id,
+                    timestamp=timestamp,
+                    extra=extra_meta
+                )
+
+            except Exception as e:
+                print(f"Warning: Failed to compute and save URDF calibration values for lidar_right_joint: {e}")
+
         if floor_to_base_link_transform is not None:
             self.floor_to_base_link_transform = floor_to_base_link_transform
             if hasattr(floor_to_base_link_transform, 'tolist'):
