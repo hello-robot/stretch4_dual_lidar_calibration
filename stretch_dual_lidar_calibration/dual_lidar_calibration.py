@@ -3,7 +3,9 @@ from scipy.spatial.transform import Rotation as R
 import numpy as np
 import os
 import yaml
-from stretch4_urdf import record_joint_calibration
+from yourdfpy import URDF
+import io
+from stretch4_urdf import record_joint_calibration, get_urdf_from_robot_params
 
 class DualLidarCalibration:
     def __init__(self, filename=None):
@@ -77,7 +79,40 @@ class DualLidarCalibration:
             if fit_method: extra_meta['fit_method'] = fit_method
             if rmse: extra_meta['rmse'] = float(rmse)
             
+            
             data['right_to_left_transform'] = pack(val, robot_id, timestamp, extra=extra_meta)
+
+            try:
+                # Update stretch_calibration_values.yaml with absolute lidar transforms
+                urdf_contents = get_urdf_from_robot_params(apply_calibration=False)
+                urdf = URDF.load(io.StringIO(urdf_contents))
+                
+                def get_nominal_transform(joint_name):
+                    for joint in urdf.robot.joints:
+                        if joint.name == joint_name:
+                            return joint.origin
+                    return np.eye(4)
+                
+                T_head_lidar_left = get_nominal_transform('lidar_left_joint')
+                # T_head_lidar_right = T_head_lidar_left * T_left_right
+                # right_to_left is T_left_right
+                T_head_lidar_right = T_head_lidar_left @ right_to_left_transform
+
+                def T_to_strings(T):
+                    xyz = " ".join([f"{x:.18f}" for x in T[:3, 3]])
+                    rpy = " ".join([f"{x:.18f}" for x in R.from_matrix(T[:3, :3]).as_euler('xyz')])
+                    return xyz, rpy
+
+                # Record Left Lidar
+                xyz_l, rpy_l = T_to_strings(T_head_lidar_left)
+                record_joint_calibration('lidar_left_joint', xyz_l, rpy_l, 'head_link', 'lidar_left_link', robot_id, timestamp=timestamp)
+
+                # Record Right Lidar
+                xyz_r, rpy_r = T_to_strings(T_head_lidar_right)
+                record_joint_calibration('lidar_right_joint', xyz_r, rpy_r, 'head_link', 'lidar_right_link', robot_id, timestamp=timestamp, extra=extra_meta)
+
+            except Exception as e:
+                print(f"Warning: Failed to record absolute lidar calibrations: {e}")
             
         if floor_to_base_link_transform is not None:
             self.floor_to_base_link_transform = floor_to_base_link_transform
