@@ -3,6 +3,8 @@ from scipy.spatial.transform import Rotation as R
 import numpy as np
 import os
 import yaml
+from yourdfpy import URDF
+import io
 from stretch4_urdf import record_joint_calibration, get_urdf_from_robot_params
 
 class DualLidarCalibration:
@@ -82,8 +84,6 @@ class DualLidarCalibration:
 
             try:
                 # Update stretch_calibration_values.yaml with absolute lidar transforms
-                from yourdfpy import URDF
-                import io
                 urdf_contents = get_urdf_from_robot_params(apply_calibration=False)
                 urdf = URDF.load(io.StringIO(urdf_contents))
                 
