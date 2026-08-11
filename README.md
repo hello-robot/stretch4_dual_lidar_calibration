@@ -138,6 +138,11 @@ floor_model_params:
   rmse: 0.011044131704765942
 ```
 
+### URDF Calibration 
+
+A copy of the calibration extrinsic transforms are also written to `
+echo $HELLO_FLEET_PATH/$HELLO_FLEET_ID/stretch_calibration_values.yaml`, and are loaded as part of the Calibrated URDF. You can read more about the Calibrated URDF at https://github.com/hello-robot/stretch4_urdf/blob/main/stretch4_urdf/calibration.md
+
 ## Calibration Details
 
 This package uses a multi-step process to calibrate the dual LiDAR setup, align the robot with the floor, and define the robot's body mode.
